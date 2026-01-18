@@ -1,26 +1,38 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>VR Math: Remote Control</title>
+    <title>VR Math: Master Remote</title>
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        #setup-gui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #111; z-index: 999; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; font-family: sans-serif; }
-        .btn { padding: 20px; margin: 10px; background: #444; color: white; border: none; border-radius: 10px; width: 80%; font-size: 20px; }
+        #setup-gui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #111; z-index: 999; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; font-family: sans-serif; text-align: center; }
+        .btn { padding: 20px; margin: 10px; background: #007bff; color: white; border: none; border-radius: 10px; width: 80%; font-size: 20px; cursor: pointer; }
         #remote-ui { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #222; z-index: 1000; }
         #fire-btn { width: 100%; height: 100%; background: #ff3e3e; color: white; font-size: 40px; border: none; }
+        input { padding: 15px; font-size: 20px; width: 70%; margin-bottom: 10px; border-radius: 5px; }
     </style>
 </head>
 <body>
     <div id="setup-gui">
-        <h1>VR MATH REMOTE</h1>
-        <button class="btn" onclick="initScreen()">BE THE SCREEN (In Headset)</button>
-        <button class="btn" onclick="initRemote()">BE THE REMOTE (In Hand)</button>
-        <p id="status">Waiting for choice...</p>
+        <div id="choice-step">
+            <h1>VR MATH CONTROL</h1>
+            <button class="btn" onclick="showScreenSetup()">BE THE SCREEN (VR)</button>
+            <button class="btn" onclick="showRemoteSetup()">BE THE REMOTE</button>
+        </div>
+        <div id="screen-setup" style="display:none">
+            <h2>ROOM CODE:</h2>
+            <h1 id="display-code" style="color: #00FF00; font-size: 50px;">...</h1>
+            <p>Enter this on the Remote phone.</p>
+        </div>
+        <div id="remote-setup" style="display:none">
+            <h2>ENTER CODE:</h2>
+            <input type="text" id="join-code" placeholder="Example: 1234">
+            <button class="btn" onclick="initRemote()">CONNECT</button>
+        </div>
     </div>
 
     <div id="remote-ui">
-        <button id="fire-btn">TAP TO ANSWER</button>
+        <button id="fire-btn">TAP TO CHOOSE</button>
     </div>
 
     <a-scene>
@@ -31,89 +43,103 @@
 
         <a-entity id="start-menu" position="0 1.6 -3" visible="true">
             <a-text value="SELECT DIFFICULTY" position="0 1.2 0" align="center" width="6" color="#FF3E3E"></a-text>
-            <a-entity class="clickable" id="easy" geometry="primitive: plane; width: 1.2; height: 0.5" material="color: #444" position="-1.5 0.5 0" data-type="menu" data-val="easy"><a-text value="EASY" align="center"></a-text></a-entity>
-            <a-entity class="clickable" id="medium" geometry="primitive: plane; width: 1.2; height: 0.5" material="color: #444" position="0 0.5 0" data-type="menu" data-val="medium"><a-text value="MEDIUM" align="center"></a-text></a-entity>
-            <a-entity class="clickable" id="hard" geometry="primitive: plane; width: 1.2; height: 0.5" material="color: #444" position="1.5 0.5 0" data-type="menu" data-val="hard"><a-text value="HARD" align="center"></a-text></a-entity>
+            <a-entity class="clickable" id="easy" geometry="primitive: plane; width: 1.2; height: 0.5" material="color: #444" position="-1.5 0.5 0" onclick="setDifficulty('easy')"><a-text value="EASY" align="center"></a-text></a-entity>
+            <a-entity class="clickable" id="medium" geometry="primitive: plane; width: 1.2; height: 0.5" material="color: #444" position="0 0.5 0" onclick="setDifficulty('medium')"><a-text value="MEDIUM" align="center"></a-text></a-entity>
+            <a-entity class="clickable" id="hard" geometry="primitive: plane; width: 1.2; height: 0.5" material="color: #444" position="1.5 0.5 0" onclick="setDifficulty('hard')"><a-text value="HARD" align="center"></a-text></a-entity>
         </a-entity>
 
         <a-entity id="game-elements" position="0 1.6 -3.5" visible="false">
             <a-text id="score-vr" value="PTS: 0" position="-0.8 1.8 0" width="4" align="center" color="#00FF00"></a-text>
-            <a-text id="timer-vr" value="TIME: 20" position="0.8 1.8 0" width="4" align="center" color="#FFD700"></a-text>
+            <a-text id="timer-vr" value="TIME: 20" position="0.7 1.8 0" width="4" align="center" color="#FFD700"></a-text>
             <a-text id="question-text" value="" position="0 1.2 0" align="center" width="7" color="#FFD700"></a-text>
-            <a-entity id="opt0" class="clickable ans-box" geometry="primitive: plane; width: 1.5; height: 0.7" material="color: #333" position="-0.9 0.3 0" data-type="ans" data-idx="0"><a-text id="txt0" value="-" align="center"></a-text></a-entity>
-            <a-entity id="opt1" class="clickable ans-box" geometry="primitive: plane; width: 1.5; height: 0.7" material="color: #333" position="0.9 0.3 0" data-type="ans" data-idx="1"><a-text id="txt1" value="-" align="center"></a-text></a-entity>
-            <a-entity id="opt2" class="clickable ans-box" geometry="primitive: plane; width: 1.5; height: 0.7" material="color: #333" position="-0.9 -0.6 0" data-type="ans" data-idx="2"><a-text id="txt2" value="-" align="center"></a-text></a-entity>
-            <a-entity id="opt3" class="clickable ans-box" geometry="primitive: plane; width: 1.5; height: 0.7" material="color: #333" position="0.9 -0.6 0" data-type="ans" data-idx="3"><a-text id="txt3" value="-" align="center"></a-text></a-entity>
+            <a-entity id="opt0" class="ans-box" geometry="primitive: plane; width: 1.5; height: 0.7" material="color: #333" position="-0.9 0.3 0" onclick="checkAns(0)"><a-text id="txt0" value="-" align="center"></a-text></a-entity>
+            <a-entity id="opt1" class="ans-box" geometry="primitive: plane; width: 1.5; height: 0.7" material="color: #333" position="0.9 0.3 0" onclick="checkAns(1)"><a-text id="txt1" value="-" align="center"></a-text></a-entity>
+            <a-entity id="opt2" class="ans-box" geometry="primitive: plane; width: 1.5; height: 0.7" material="color: #333" position="-0.9 -0.6 0" onclick="checkAns(2)"><a-text id="txt2" value="-" align="center"></a-text></a-entity>
+            <a-entity id="opt3" class="ans-box" geometry="primitive: plane; width: 1.5; height: 0.7" material="color: #333" position="0.9 -0.6 0" onclick="checkAns(3)"><a-text id="txt3" value="-" align="center"></a-text></a-entity>
         </a-entity>
     </a-scene>
 
     <script>
-        let score = 0, questionsDone = 0, timeLeft = 20, currentAnswer, isPlaying = false, hoveredElement = null;
-        const peer = new Peer('math-vr-session-123'); // Unique ID for your session
+        let score = 0, currentAnswer, hoveredElement = null, isPlaying = false, peer, conn;
 
-        function initScreen() {
-            document.getElementById('setup-gui').style.display = 'none';
-            peer.on('connection', (conn) => {
-                conn.on('data', (data) => { if(data === 'CLICK' && hoveredElement) hoveredElement.click(); });
+        // --- NETWORK LOGIC ---
+        function showScreenSetup() {
+            const code = Math.floor(1000 + Math.random() * 9000);
+            document.getElementById('choice-step').style.display = 'none';
+            document.getElementById('screen-setup').style.display = 'block';
+            document.getElementById('display-code').innerText = code;
+            
+            peer = new Peer('math-vr-' + code);
+            peer.on('open', () => console.log("Screen ready"));
+            peer.on('connection', (c) => {
+                document.getElementById('setup-gui').style.display = 'none';
+                c.on('data', (data) => { if(data === 'CLICK' && hoveredElement) hoveredElement.click(); });
             });
         }
 
+        function showRemoteSetup() {
+            document.getElementById('choice-step').style.display = 'none';
+            document.getElementById('remote-setup').style.display = 'block';
+        }
+
         function initRemote() {
-            document.getElementById('setup-gui').style.display = 'none';
-            document.getElementById('remote-ui').style.display = 'block';
-            const conn = peer.connect('math-vr-session-123');
-            document.getElementById('fire-btn').onclick = () => conn.send('CLICK');
+            const code = document.getElementById('join-code').value;
+            peer = new Peer();
+            peer.on('open', () => {
+                conn = peer.connect('math-vr-' + code);
+                conn.on('open', () => {
+                    document.getElementById('setup-gui').style.display = 'none';
+                    document.getElementById('remote-ui').style.display = 'block';
+                });
+            });
+            document.getElementById('fire-btn').addEventListener('touchstart', (e) => { e.preventDefault(); conn.send('CLICK'); });
+            document.getElementById('fire-btn').addEventListener('click', () => { conn.send('CLICK'); });
         }
 
         // --- GAME LOGIC ---
         document.addEventListener('mouseenter', (e) => {
-            if (e.target.classList.contains('clickable')) {
+            if (e.target.classList.contains('clickable') || e.target.classList.contains('ans-box')) {
                 hoveredElement = e.target;
                 document.getElementById('my-cursor').setAttribute('material', 'color', '#FF0000');
             }
         }, true);
 
-        document.addEventListener('mouseleave', (e) => {
-            if (hoveredElement === e.target) {
-                document.getElementById('my-cursor').setAttribute('material', 'color', '#00FF00');
-                hoveredElement = null;
-            }
+        document.addEventListener('mouseleave', () => {
+            hoveredElement = null;
+            document.getElementById('my-cursor').setAttribute('material', 'color', '#00FF00');
         }, true);
 
-        function setDifficulty(mode) {
-            difficulty = mode;
+        function setDifficulty() {
             document.getElementById('start-menu').setAttribute('visible', 'false');
             document.getElementById('game-elements').setAttribute('visible', 'true');
+            document.querySelectorAll('.ans-box').forEach(el => el.classList.add('clickable'));
             isPlaying = true;
-            startLevel();
+            generateMath();
         }
 
         function generateMath() {
-            let a = Math.floor(Math.random()*20), b = Math.floor(Math.random()*20);
+            let a = Math.floor(Math.random()*10), b = Math.floor(Math.random()*10);
             currentAnswer = a + b;
             document.querySelector('#question-text').setAttribute('value', `${a} + ${b}`);
             for(let i=0; i<4; i++) {
-                let val = (i===0) ? currentAnswer : currentAnswer + i + 1;
+                let val = (i===0) ? currentAnswer : currentAnswer + (i+1);
                 document.querySelector(`#txt${i}`).setAttribute('value', val);
                 document.querySelector(`#opt${i}`).setAttribute('data-val', val);
             }
         }
 
         function checkAns(idx) {
+            if(!isPlaying) return;
             const sel = parseInt(document.querySelector(`#opt${idx}`).getAttribute('data-val'));
-            if(sel === currentAnswer) { score++; generateMath(); } else { alert("Wrong! Score: " + score); location.reload(); }
-            document.querySelector('#score-vr').setAttribute('value', "PTS: " + score);
+            if(sel === currentAnswer) {
+                score++;
+                document.querySelector('#score-vr').setAttribute('value', "PTS: " + score);
+                generateMath();
+            } else {
+                alert("Game Over! Score: " + score);
+                location.reload();
+            }
         }
-
-        function startLevel() { generateMath(); }
-
-        // Standard click backup for difficulty
-        document.querySelectorAll('.clickable').forEach(el => {
-            el.addEventListener('click', () => {
-                if(el.getAttribute('data-type') === 'menu') setDifficulty(el.getAttribute('data-val'));
-                if(el.getAttribute('data-type') === 'ans') checkAns(el.getAttribute('data-idx'));
-            });
-        });
     </script>
 </body>
 </html>
