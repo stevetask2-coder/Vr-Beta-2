@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>VR Math: Demon Lord</title>
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+</head>
+<body>
+    <a-scene>
+        <a-sky color="#050505"></a-sky>
+        
+        <a-entity camera look-controls position="0 1.6 0">
+            <a-entity id="my-cursor" cursor="fuse: false" position="0 0 -1"
+                      geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03"
+                      material="color: #00FF00; shader: flat"
+                      raycaster="objects: .clickable">
+            </a-entity>
+        </a-entity>
+
+        <a-entity id="start-menu" position="0 1.6 -3" visible="true">
+            <a-text value="SELECT DIFFICULTY" position="0 1.2 0" align="center" width="6" color="#FF3E3E"></a-text>
+            
+            <a-entity class="clickable" id="btn-easy" geometry="primitive: plane; width: 1.2; height: 0.5" material="color: #444" position="-1.5 0.5 0" onclick="setDifficulty('easy')">
+                <a-text value="EASY" align="center" position="0 0 0.05"></a-text>
+            </a-entity>
+            <a-entity class="clickable" id="btn-med" geometry="primitive: plane; width: 1.2; height: 0.5" material="color: #444" position="0 0.5 0" onclick="setDifficulty('medium')">
+                <a-text value="MEDIUM" align="center" position="0 0 0.05"></a-text>
+            </a-entity>
+            <a-entity class="clickable" id="btn-hard" geometry="primitive: plane; width: 1.2; height: 0.5" material="color: #444" position="1.5 0.5 0" onclick="setDifficulty('hard')">
+                <a-text value="HARD" align="center" position="0 0 0.05"></a-text>
+            </a-entity>
+        </a-entity>
+
+        <a-entity id="prep-screen" position="0 1.6 -3" visible="false">
+            <a-text value="GET READY" position="0 0.8 0" align="center" width="8" color="#FFD700"></a-text>
+            <a-text id="prep-timer-text" value="30" position="0 0.2 0" align="center" width="12" color="#FF4D4D"></a-text>
+            <a-entity id="skip-btn" geometry="primitive: plane; width: 1; height: 0.4" material="color: #666" position="0 -0.8 0" onclick="skipPrep()">
+                <a-text value="SKIP" align="center" position="0 0 0.05"></a-text>
+            </a-entity>
+        </a-entity>
+
+        <a-entity id="game-elements" position="0 1.6 -3.5" visible="false">
+            <a-text id="score-vr" value="PTS: 0" position="-0.8 1.8 0" width="4" align="center" color="#00FF00"></a-text>
+            <a-text id="timer-vr" value="TIME: 20" position="0.8 1.8 0" width="4" align="center" color="#FFD700"></a-text>
+            <a-text id="question-text" value="" position="0 1.2 0" align="center" width="7" color="#FFD700"></a-text>
+            
+            <a-entity id="opt0" class="ans-box" geometry="primitive: plane; width: 1.5; height: 0.7" material="color: #333" position="-0.9 0.3 0" onclick="checkAns(0)">
+                <a-text id="txt0" value="-" align="center" position="0 0 0.05"></a-text>
+            </a-entity>
+            <a-entity id="opt1" class="ans-box" geometry="primitive: plane; width: 1.5; height: 0.7" material="color: #333" position="0.9 0.3 0" onclick="checkAns(1)">
+                <a-text id="txt1" value="-" align="center" position="0 0 0.05"></a-text>
+            </a-entity>
+            <a-entity id="opt2" class="ans-box" geometry="primitive: plane; width: 1.5; height: 0.7" material="color: #333" position="-0.9 -0.6 0" onclick="checkAns(2)">
+                <a-text id="txt2" value="-" align="center" position="0 0 0.05"></a-text>
+            </a-entity>
+            <a-entity id="opt3" class="ans-box" geometry="primitive: plane; width: 1.5; height: 0.7" material="color: #333" position="0.9 -0.6 0" onclick="checkAns(3)">
+                <a-text id="txt3" value="-" align="center" position="0 0 0.05"></a-text>
+            </a-entity>
+        </a-entity>
+    </a-scene>
+
+    <script>
+        let score = 0, questionsDone = 0, timeLeft = 20, currentAnswer;
+        let difficulty = 'easy', timerInterval, prepInterval, isPlaying = false;
+        let hoveredElement = null;
+
+        // GLOBAL TRIGGER: Volume Button / Any Key
+        window.addEventListener('keydown', function(e) {
+            if (hoveredElement) {
+                console.log("Triggered click on:", hoveredElement.id);
+                hoveredElement.click(); 
+            }
+        });
+
+        // HOVER SYSTEM
+        document.addEventListener('mouseenter', (e) => {
+            if (e.target.classList.contains('clickable') || e.target.classList.contains('ans-box')) {
+                hoveredElement = e.target;
+                // Visual feedback: Cursor turns red and button brightens
+                document.getElementById('my-cursor').setAttribute('material', 'color', '#FF0000');
+                e.target.setAttribute('material', 'color', '#888'); 
+            }
+        }, true);
+
+        document.addEventListener('mouseleave', (e) => {
+            if (hoveredElement === e.target) {
+                // Visual feedback: Reset colors
+                document.getElementById('my-cursor').setAttribute('material', 'color', '#00FF00');
+                let originalColor = e.target.classList.contains('ans-box') ? '#333' : '#444';
+                if(e.target.id === 'skip-btn') originalColor = '#666';
+                e.target.setAttribute('material', 'color', originalColor);
+                hoveredElement = null;
+            }
+        }, true);
+
+        function setDifficulty(mode) {
+            difficulty = mode;
+            document.getElementById('start-menu').setAttribute('visible', 'false');
+            // Deactivate menu items
+            document.querySelectorAll('#start-menu .clickable').forEach(el => el.classList.remove('clickable'));
+            startPrepCountdown();
+        }
+
+        function startPrepCountdown() {
+            let prepTime = 30;
+            document.getElementById('prep-screen').setAttribute('visible', 'true');
+            document.getElementById('skip-btn').classList.add('clickable');
+            
+            prepInterval = setInterval(() => {
+                prepTime--;
+                document.getElementById('prep-timer-text').setAttribute('value', prepTime);
+                if (prepTime <= 0) skipPrep();
+            }, 1000);
+        }
+
+        function skipPrep() {
+            clearInterval(prepInterval);
+            document.getElementById('prep-screen').setAttribute('visible', 'false');
+            document.getElementById('skip-btn').classList.remove('clickable');
+            document.getElementById('game-elements').setAttribute('visible', 'true');
+            
+            // Activate answers
+            document.querySelectorAll('.ans-box').forEach(el => el.classList.add('clickable'));
+            
+            isPlaying = true;
+            startLevel();
+        }
+
+        function generateMath() {
+            let a, b;
+            const op = Math.random() > 0.5 ? '+' : '-';
+            if (difficulty === 'easy') { a = Math.floor(Math.random() * 9) + 1; b = Math.floor(Math.random() * 9) + 1; }
+            else if (difficulty === 'medium') { a = Math.floor(Math.random() * 45) + 5; b = Math.floor(Math.random() * 15) + 1; }
+            else { a = Math.floor(Math.random() * 80) + 20; b = Math.floor(Math.random() * 80) + 20; }
+
+            if (op === '-' && a < b) [a, b] = [b, a];
+            currentAnswer = op === '+' ? a + b : a - b;
+            document.querySelector('#question-text').setAttribute('value', `${a} ${op} ${b}`);
+            
+            let answers = [currentAnswer];
+            while(answers.length < 4) {
+                let offset = Math.floor(Math.random() * 11) - 5;
+                let wrong = currentAnswer + offset;
+                if(!answers.includes(wrong) && wrong >= 0 && offset !== 0) answers.push(wrong);
+            }
+            answers.sort(() => Math.random() - 0.5);
+            for(let i=0; i<4; i++) {
+                document.querySelector(`#txt${i}`).setAttribute('value', answers[i]);
+                document.querySelector(`#opt${i}`).setAttribute('data-val', answers[i]);
+            }
+        }
+
+        function checkAns(index) {
+            if(!isPlaying) return;
+            const selected = parseInt(document.querySelector(`#opt${index}`).getAttribute('data-val'));
+            
+            if(selected === currentAnswer) {
+                score += (questionsDone < 7) ? 1 : (questionsDone < 12) ? 8 : 10;
+                questionsDone++;
+                document.querySelector('#score-vr').setAttribute('value', "PTS: " + score);
+                if(questionsDone >= 14) winGame(); else startLevel();
+            } else { 
+                endGame("WRONG ANSWER!"); 
+            }
+        }
+
+        function startLevel() {
+            timeLeft = (questionsDone < 7) ? 20 : (questionsDone < 12) ? 10 : 5;
+            document.querySelector('#timer-vr').setAttribute('value', "TIME: " + timeLeft);
+            generateMath();
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                if(!isPlaying) return;
+                timeLeft--;
+                document.querySelector('#timer-vr').setAttribute('value', "TIME: " + timeLeft);
+                if(timeLeft <= 0) endGame("TIME EXPIRED!");
+            }, 1000);
+        }
+
+        function endGame(msg) {
+            isPlaying = false;
+            clearInterval(timerInterval);
+            alert(msg + "\nScore: " + score);
+            location.reload();
+        }
+
+        function winGame() {
+            isPlaying = false;
+            clearInterval(timerInterval);
+            alert("VICTORY! Score: " + score);
+            location.reload();
+        }
+    </script>
+</body>
+</html>
